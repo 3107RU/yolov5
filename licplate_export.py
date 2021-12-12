@@ -90,10 +90,12 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
         torch.onnx.export(model, im, f, verbose=False, opset_version=opset,
                           training=torch.onnx.TrainingMode.TRAINING if train else torch.onnx.TrainingMode.EVAL,
                           do_constant_folding=not train,
-                          input_names=['images'],
-                          output_names=['output'],
-                          dynamic_axes={'images': {0: 'batch', 2: 'height', 3: 'width'},  # shape(1,3,640,640)
-                                        'output': {0: 'batch', 1: 'anchors'}  # shape(1,25200,85)
+                          input_names=['input'],
+                          output_names=['output1', 'output2', 'output3'],
+                          dynamic_axes={'input': {2: 'height', 3: 'width'},  # shape(1,3,640,640)
+                                        'output1': {2: 'y', 3: 'x'},
+                                        'output2': {2: 'y', 3: 'x'},
+                                        'output3': {2: 'y', 3: 'x'}
                                         } if dynamic else None)
 
         # Checks
@@ -111,7 +113,7 @@ def export_onnx(model, im, file, opset, train, dynamic, simplify, prefix=colorst
                 model_onnx, check = onnxsim.simplify(
                     model_onnx,
                     dynamic_input_shape=dynamic,
-                    input_shapes={'images': list(im.shape)} if dynamic else None)
+                    input_shapes={'input': list(im.shape)} if dynamic else None)
                 assert check, 'assert check failed'
                 onnx.save(model_onnx, f)
             except Exception as e:
@@ -361,6 +363,7 @@ def run(data=ROOT / 'data/coco128.yaml',  # 'dataset.yaml path'
             if isinstance(m.act, nn.SiLU):
                 m.act = SiLU()
         elif isinstance(m, Detect):
+            m.licplate_export = True
             m.inplace = inplace
             m.onnx_dynamic = dynamic
             # m.forward = m.forward_export  # assign forward (optional)
